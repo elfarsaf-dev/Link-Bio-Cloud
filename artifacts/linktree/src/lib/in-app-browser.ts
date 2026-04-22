@@ -78,6 +78,14 @@ export function parseWhatsAppUrl(url: string): { phone: string; text?: string } 
   }
 }
 
+/** Native WhatsApp scheme URL (whatsapp://send?...). Often works on iOS
+ *  in-app browsers when triggered from a real anchor click. */
+export function buildWhatsAppScheme(phone: string, text?: string): string {
+  const p = phone.replace(/[^\d]/g, "");
+  const q = `phone=${p}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
+  return `whatsapp://send?${q}`;
+}
+
 /** Build an Android intent:// URL that launches WhatsApp directly,
  *  bypassing TikTok/IG/FB in-app webviews. */
 export function buildWhatsAppAndroidIntent(phone: string, text?: string): string {

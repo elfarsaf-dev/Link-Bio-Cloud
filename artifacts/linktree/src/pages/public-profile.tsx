@@ -14,6 +14,7 @@ import {
   isWhatsAppUrl,
   parseWhatsAppUrl,
   buildWhatsAppAndroidIntent,
+  buildWhatsAppScheme,
   copyToClipboard,
 } from "@/lib/in-app-browser";
 import { Copy, ExternalLink, AlertCircle } from "lucide-react";
@@ -94,13 +95,18 @@ export default function PublicProfile() {
 
     if (isWhatsAppUrl(url) && inApp) {
       const parsed = parseWhatsAppUrl(url);
-      if (parsed && isAndroid()) {
-        // Android: launch WhatsApp directly via intent (bypasses TikTok/IG webview)
-        window.location.href = buildWhatsAppAndroidIntent(parsed.phone, parsed.text);
-        return;
-      }
-      // iOS in-app or unknown: show helper modal with copy/instructions
+      // Show modal as guaranteed fallback (kept open until user dismisses)
       setWaBlockedUrl(url);
+      if (parsed) {
+        // Auto-attempt direct launch in same tick (must be sync from click).
+        // If it succeeds, the page navigates away and modal never shows.
+        if (isAndroid()) {
+          window.location.href = buildWhatsAppAndroidIntent(parsed.phone, parsed.text);
+        } else if (isIOS()) {
+          // iOS: native scheme often works inside TikTok/IG webview
+          window.location.href = buildWhatsAppScheme(parsed.phone, parsed.text);
+        }
+      }
       return;
     }
 
@@ -380,6 +386,9 @@ function WhatsAppHelperModal({
   const parsed = parseWhatsAppUrl(url);
   const [copied, setCopied] = useState<"url" | "phone" | null>(null);
   const ios = isIOS();
+  const android = isAndroid();
+  const schemeUrl = parsed ? buildWhatsAppScheme(parsed.phone, parsed.text) : url;
+  const intentUrl = parsed ? buildWhatsAppAndroidIntent(parsed.phone, parsed.text) : url;
 
   const handleCopy = async (text: string, kind: "url" | "phone") => {
     const ok = await copyToClipboard(text);
@@ -448,19 +457,34 @@ function WhatsAppHelperModal({
 
           <div className="space-y-2">
             <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
+              href={schemeUrl}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#25D366] text-white font-mono text-sm font-semibold hover:bg-[#1fb155] transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
-              Coba Buka WhatsApp
+              Buka WhatsApp Sekarang
+            </a>
+            {android && (
+              <a
+                href={intentUrl}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#25D366]/40 text-[#25D366] font-mono text-sm hover:bg-[#25D366]/10 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Coba Cara Lain
+              </a>
+            )}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Buka via wa.me (browser luar)
             </a>
             <button
               onClick={() => handleCopy(url, "url")}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background hover:bg-muted font-mono text-sm transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border bg-background hover:bg-muted font-mono text-xs transition-colors"
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="w-3.5 h-3.5" />
               {copied === "url" ? "Tersalin!" : "Salin Link"}
             </button>
             {parsed?.phone && (

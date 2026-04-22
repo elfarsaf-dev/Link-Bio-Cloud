@@ -305,10 +305,14 @@ function StoryViewer({
             <img src={story.mediaUrl} alt="" className="w-full h-full object-contain" />
           )
         ) : (
-          <div className="w-full h-full flex items-center justify-center p-8 text-center bg-gradient-to-br from-pink-500 via-fuchsia-500 to-orange-400">
-            <p className="text-white text-2xl font-mono font-bold leading-snug whitespace-pre-wrap">
-              {story.text}
-            </p>
+          <div className="w-full h-full flex items-center justify-center p-6">
+            <div className="relative max-w-[85%] bg-gradient-to-br from-pink-500 via-fuchsia-500 to-orange-400 text-white rounded-3xl rounded-bl-md px-5 py-4 shadow-2xl">
+              <p className="text-base sm:text-lg font-mono font-medium leading-snug whitespace-pre-wrap break-words">
+                {story.text}
+              </p>
+              <span className="absolute -bottom-1.5 left-3 w-3 h-3 bg-pink-500 rounded-full" />
+              <span className="absolute -bottom-4 left-0 w-2 h-2 bg-pink-500 rounded-full" />
+            </div>
           </div>
         )}
         {story.text && story.mediaUrl && (

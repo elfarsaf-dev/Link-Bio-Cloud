@@ -17,7 +17,7 @@ import {
   buildWhatsAppScheme,
   copyToClipboard,
 } from "@/lib/in-app-browser";
-import { Copy, ExternalLink, AlertCircle } from "lucide-react";
+import { Copy, ExternalLink, AlertCircle, Check } from "lucide-react";
 
 interface Story {
   id: string;
@@ -199,27 +199,39 @@ export default function PublicProfile() {
             links.map((link) => {
               const social = detectSocial(link.url);
               const Icon = social.Icon;
+              const isWa = isWhatsAppUrl(link.url);
+              const waPhone = isWa ? parseWhatsAppUrl(link.url)?.phone : undefined;
               return (
-                <button
+                <div
                   key={link.id}
-                  onClick={() => handleLinkClick(link.id, link.url)}
-                  className="group relative w-full flex items-center justify-between px-5 py-4 rounded-xl bg-card border border-border hover:border-primary/60 hover:bg-primary/5 transition-all duration-200 active:scale-[0.98] overflow-hidden text-left"
+                  className="group relative w-full flex items-stretch rounded-xl bg-card border border-border hover:border-primary/60 hover:bg-primary/5 transition-all duration-200 overflow-hidden"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/8 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-                  <div className="flex items-center gap-3 z-10 min-w-0">
-                    <div
-                      className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200"
-                      style={{ backgroundColor: `${social.color}1A`, color: social.color }}
-                      aria-label={social.name}
-                    >
-                      <Icon className="w-4 h-4" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/8 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                  <button
+                    type="button"
+                    onClick={() => handleLinkClick(link.id, link.url)}
+                    className="flex-1 min-w-0 flex items-center justify-between px-5 py-4 text-left active:scale-[0.98] transition-transform"
+                  >
+                    <div className="flex items-center gap-3 z-10 min-w-0">
+                      <div
+                        className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200"
+                        style={{ backgroundColor: `${social.color}1A`, color: social.color }}
+                        aria-label={social.name}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="font-semibold text-card-foreground group-hover:text-primary transition-colors duration-200 font-mono text-sm truncate">
+                        {link.title}
+                      </span>
                     </div>
-                    <span className="font-semibold text-card-foreground group-hover:text-primary transition-colors duration-200 font-mono text-sm truncate">
-                      {link.title}
-                    </span>
-                  </div>
-                  <MoveRight className="shrink-0 w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all duration-200 z-10 ml-2" />
-                </button>
+                    {!waPhone && (
+                      <MoveRight className="shrink-0 w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all duration-200 z-10 ml-2" />
+                    )}
+                  </button>
+                  {waPhone && (
+                    <CopyPhoneButton phone={waPhone} />
+                  )}
+                </div>
               );
             })
           ) : (
@@ -375,6 +387,39 @@ function StoryViewer({
 
       <style>{`@keyframes progress { from { width: 0% } to { width: 100% } }`}</style>
     </div>
+  );
+}
+
+function CopyPhoneButton({ phone }: { phone: string }) {
+  const [copied, setCopied] = useState(false);
+  const handle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await copyToClipboard(phone);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      className="shrink-0 px-3 sm:px-4 flex items-center justify-center gap-1.5 border-l border-border bg-card hover:bg-[#25D366]/10 hover:text-[#25D366] text-muted-foreground transition-colors active:scale-95 z-10"
+      aria-label={copied ? "Nomor tersalin" : "Salin nomor WhatsApp"}
+      title={copied ? "Tersalin!" : `Salin +${phone}`}
+    >
+      {copied ? (
+        <>
+          <Check className="w-4 h-4" />
+          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Tersalin</span>
+        </>
+      ) : (
+        <>
+          <Copy className="w-4 h-4" />
+          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Salin</span>
+        </>
+      )}
+    </button>
   );
 }
 

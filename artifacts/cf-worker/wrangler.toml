@@ -1,0 +1,10 @@
+name = "linkhub-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+
+[vars]
+SUPABASE_URL = "https://bgwkwlrkvbspycqsdeif.supabase.co"
+
+# Secrets — set via wrangler secret put:
+# wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+# wrangler secret put JWT_SECRET

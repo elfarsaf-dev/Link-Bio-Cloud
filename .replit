@@ -1,0 +1,86 @@
+modules = ["nodejs-24", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[[ports]]
+localPort = 5173
+externalPort = 5173
+
+[[ports]]
+localPort = 5174
+externalPort = 3002
+
+[[ports]]
+localPort = 5175
+externalPort = 3003
+
+[[ports]]
+localPort = 5176
+externalPort = 6000
+
+[[ports]]
+localPort = 5177
+externalPort = 8008
+
+[[ports]]
+localPort = 5178
+externalPort = 8081
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 80
+
+[[ports]]
+localPort = 8082
+externalPort = 4200
+
+[[ports]]
+localPort = 8083
+externalPort = 5000
+
+[[ports]]
+localPort = 8084
+externalPort = 6800
+
+[[ports]]
+localPort = 8085
+externalPort = 8000
+
+[[ports]]
+localPort = 8086
+externalPort = 8099
+
+[[ports]]
+localPort = 25140
+externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_URL = "https://bgwkwlrkvbspycqsdeif.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnd2t3bHJrdmJzcHljcXNkZWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NTU1NzAsImV4cCI6MjA5MDQzMTU3MH0.z4y22dEpTmIYRi_kmXFE71fJIeNZYEMseXAwjcZZgG4"
+JWT_SECRET = "linkhub-ljel49ma3qsj8lpxbhn1"
+
+[nix]
+channel = "stable-25_05"

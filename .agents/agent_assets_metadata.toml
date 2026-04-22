@@ -1,0 +1,14 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "fOqkARYUBR3OqMU-LJ9Vz"
+uri = "file://linkhub-frontend.tar.gz"
+type = "unspecified"
+title = "linkhub-frontend.tar.gz (updated — tema + mobile fix)"
+
+[[outputs]]
+id = "6ZvkSsPrF6Pxlx7hl7mdS"
+uri = "file://CLOUDFLARE_PAGES_DEPLOY.md"
+type = "text"
+title = "Panduan Deploy Cloudflare Pages"

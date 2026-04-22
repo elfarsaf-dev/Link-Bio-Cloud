@@ -1,0 +1,362 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: LinkHub API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: profile
+    description: Profile operations
+  - name: links
+    description: Link operations
+  - name: stats
+    description: Statistics operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get public profile
+      responses:
+        "200":
+          description: Profile data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    put:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update profile (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /links:
+    get:
+      operationId: getLinks
+      tags: [links]
+      summary: Get all links
+      responses:
+        "200":
+          description: List of links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Link"
+    post:
+      operationId: createLink
+      tags: [links]
+      summary: Create a new link (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLinkBody"
+      responses:
+        "201":
+          description: Created link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Link"
+
+  /links/{id}:
+    put:
+      operationId: updateLink
+      tags: [links]
+      summary: Update a link (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLinkBody"
+      responses:
+        "200":
+          description: Updated link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Link"
+    delete:
+      operationId: deleteLink
+      tags: [links]
+      summary: Delete a link (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /links/{id}/click:
+    post:
+      operationId: recordLinkClick
+      tags: [links]
+      summary: Record a link click
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Click recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClickResponse"
+
+  /links/reorder:
+    put:
+      operationId: reorderLinks
+      tags: [links]
+      summary: Reorder links (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderLinksBody"
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReorderResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get aggregate stats (admin)
+      responses:
+        "200":
+          description: Stats data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /stats/reset:
+    post:
+      operationId: resetStats
+      tags: [stats]
+      summary: Reset all click counters to zero
+      responses:
+        "200":
+          description: Stats reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        backgroundTheme:
+          type: string
+        totalClicks:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - displayName
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        backgroundTheme:
+          type: string
+
+    Link:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        icon:
+          type: string
+        clickCount:
+          type: integer
+        sortOrder:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - url
+        - isActive
+        - sortOrder
+
+    CreateLinkBody:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+      required:
+        - title
+        - url
+
+    UpdateLinkBody:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    ReorderLinksBody:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+      required:
+        - ids
+
+    ReorderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    ClickResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        clickCount:
+          type: integer
+      required:
+        - success
+        - clickCount
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    ResetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    Stats:
+      type: object
+      properties:
+        totalLinks:
+          type: integer
+        totalClicks:
+          type: integer
+        topLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Link"
+      required:
+        - totalLinks
+        - totalClicks
+        - topLinks

@@ -22,12 +22,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Pencil, Trash2, Link as LinkIcon, BarChart3, User, GripVertical, LogOut, ExternalLink, Palette, RotateCcw } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Link as LinkIcon, BarChart3, User, GripVertical, LogOut, ExternalLink, Palette, RotateCcw, Upload, Sparkles, Image as ImageIcon, Video as VideoIcon, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth";
 import { THEMES, getTheme } from "@/lib/themes";
 import { detectSocial } from "@/lib/social-icons";
+import { uploadFile } from "@/lib/upload";
+import { API_URL } from "@/config";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -156,6 +158,108 @@ export default function AdminDashboard() {
   const sortedLinks = links ? [...links].sort((a, b) => a.sortOrder - b.sortOrder) : [];
   const selectedTheme = getTheme(profileForm.backgroundTheme);
 
+  // ── Avatar upload ──
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const handleAvatarFile = async (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "File harus berupa gambar.", variant: "destructive" });
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const { url } = await uploadFile(file);
+      setProfileForm((f) => ({ ...f, avatarUrl: url }));
+      toast({ title: "Foto profil siap. Klik Simpan Profil." });
+    } catch (e: any) {
+      toast({ title: e?.message || "Upload gagal", variant: "destructive" });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // ── Stories ──
+  type Story = { id: string; text: string | null; mediaUrl: string | null; mediaType: string | null; createdAt: string; expiresAt: string };
+  const [stories, setStories] = useState<Story[]>([]);
+  const [storyText, setStoryText] = useState("");
+  const [storyMediaUrl, setStoryMediaUrl] = useState<string | null>(null);
+  const [storyMediaType, setStoryMediaType] = useState<"image" | "video" | null>(null);
+  const [storyUploading, setStoryUploading] = useState(false);
+  const [storySaving, setStorySaving] = useState(false);
+
+  const authHeader = (): Record<string, string> => {
+    const token = localStorage.getItem("lh_token") || "";
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const loadStories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/stories`, { headers: authHeader() });
+      if (res.ok) setStories(await res.json());
+    } catch {}
+  };
+  useEffect(() => { loadStories(); }, []);
+
+  const handleStoryFile = async (file: File) => {
+    if (!file) return;
+    setStoryUploading(true);
+    try {
+      const { url, type } = await uploadFile(file);
+      setStoryMediaUrl(url);
+      setStoryMediaType(type === "video" ? "video" : "image");
+    } catch (e: any) {
+      toast({ title: e?.message || "Upload gagal", variant: "destructive" });
+    } finally {
+      setStoryUploading(false);
+    }
+  };
+
+  const handleStorySave = async () => {
+    if (!storyText.trim() && !storyMediaUrl) {
+      toast({ title: "Tulis teks atau tambahkan media dulu.", variant: "destructive" });
+      return;
+    }
+    setStorySaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/stories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          text: storyText.trim() || null,
+          mediaUrl: storyMediaUrl,
+          mediaType: storyMediaType,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Gagal");
+      setStoryText("");
+      setStoryMediaUrl(null);
+      setStoryMediaType(null);
+      toast({ title: "Story diunggah! Hilang dalam 24 jam." });
+      loadStories();
+    } catch (e: any) {
+      toast({ title: e?.message || "Gagal upload story", variant: "destructive" });
+    } finally {
+      setStorySaving(false);
+    }
+  };
+
+  const handleStoryDelete = async (id: string) => {
+    if (!confirm("Hapus story ini?")) return;
+    try {
+      await fetch(`${API_URL}/api/stories/${id}`, { method: "DELETE", headers: authHeader() });
+      setStories((s) => s.filter((x) => x.id !== id));
+      toast({ title: "Story dihapus." });
+    } catch {}
+  };
+
+  const formatRemaining = (expiresAt: string) => {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (ms <= 0) return "habis";
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return h > 0 ? `${h}j ${m}m` : `${m}m`;
+  };
+
   return (
     <div className="min-h-[100dvh] w-full bg-grid-pattern relative bg-background">
       <div className="absolute inset-0 pointer-events-none bg-background/90 z-0" />
@@ -198,7 +302,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="links" className="w-full">
-          <TabsList className="grid grid-cols-4 w-full mb-6">
+          <TabsList className="grid grid-cols-5 w-full mb-6">
             <TabsTrigger value="links" className="text-xs sm:text-sm font-mono px-1 sm:px-3">
               <LinkIcon className="w-3 h-3 sm:mr-1.5 shrink-0" />
               <span className="hidden sm:inline">Links</span>
@@ -206,6 +310,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="profile" className="text-xs sm:text-sm font-mono px-1 sm:px-3">
               <User className="w-3 h-3 sm:mr-1.5 shrink-0" />
               <span className="hidden sm:inline">Profil</span>
+            </TabsTrigger>
+            <TabsTrigger value="story" className="text-xs sm:text-sm font-mono px-1 sm:px-3">
+              <Sparkles className="w-3 h-3 sm:mr-1.5 shrink-0" />
+              <span className="hidden sm:inline">Story</span>
             </TabsTrigger>
             <TabsTrigger value="theme" className="text-xs sm:text-sm font-mono px-1 sm:px-3">
               <Palette className="w-3 h-3 sm:mr-1.5 shrink-0" />
@@ -320,20 +428,171 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="avatarUrl">URL Avatar</Label>
-                      <Input
-                        id="avatarUrl"
-                        value={profileForm.avatarUrl}
-                        onChange={(e) => setProfileForm({ ...profileForm, avatarUrl: e.target.value })}
-                        placeholder="https://example.com/avatar.png"
-                        className="font-mono bg-background text-sm"
-                      />
+                      <Label>Foto Profil</Label>
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
+                          {profileForm.avatarUrl ? (
+                            <img src={profileForm.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-7 h-7 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <label className="inline-flex items-center gap-2 text-sm font-mono px-3 py-2 rounded-md border border-border bg-background hover:bg-muted cursor-pointer transition-colors">
+                            {avatarUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            {avatarUploading ? "Mengunggah…" : "Pilih foto"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              disabled={avatarUploading}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleAvatarFile(f);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                          {profileForm.avatarUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setProfileForm({ ...profileForm, avatarUrl: "" })}
+                              className="text-xs text-muted-foreground hover:text-destructive ml-2"
+                            >
+                              Hapus
+                            </button>
+                          )}
+                          <p className="text-[11px] text-muted-foreground">Otomatis dikompres ~50% biar ringan.</p>
+                        </div>
+                      </div>
                     </div>
                     <Button onClick={handleProfileSave} disabled={updateProfile.isPending} className="w-full sm:w-auto font-mono">
                       {updateProfile.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Simpan Profil
                     </Button>
                   </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── STORY TAB ─────────────────────────────── */}
+          <TabsContent value="story" className="space-y-4">
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="font-mono text-lg flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" /> Buat Story
+                </CardTitle>
+                <CardDescription>Story otomatis hilang setelah 24 jam.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={storyText}
+                  onChange={(e) => setStoryText(e.target.value)}
+                  placeholder="Tulis sesuatu… (opsional kalau pakai foto/video)"
+                  rows={3}
+                  className="bg-background resize-none"
+                  maxLength={500}
+                />
+                {storyMediaUrl && (
+                  <div className="relative rounded-lg overflow-hidden border border-border bg-muted">
+                    {storyMediaType === "video" ? (
+                      <video src={storyMediaUrl} controls className="w-full max-h-72 object-contain bg-black" />
+                    ) : (
+                      <img src={storyMediaUrl} alt="" className="w-full max-h-72 object-contain bg-black" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setStoryMediaUrl(null); setStoryMediaType(null); }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-background/80 backdrop-blur border border-border flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground"
+                      aria-label="Hapus media"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex items-center gap-2 text-sm font-mono px-3 py-2 rounded-md border border-border bg-background hover:bg-muted cursor-pointer transition-colors">
+                    {storyUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                    Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={storyUploading}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleStoryFile(f); e.target.value = ""; }}
+                    />
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm font-mono px-3 py-2 rounded-md border border-border bg-background hover:bg-muted cursor-pointer transition-colors">
+                    {storyUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <VideoIcon className="w-4 h-4" />}
+                    Video
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      disabled={storyUploading}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleStoryFile(f); e.target.value = ""; }}
+                    />
+                  </label>
+                  <Button
+                    onClick={handleStorySave}
+                    disabled={storySaving || storyUploading}
+                    size="sm"
+                    className="font-mono ml-auto"
+                  >
+                    {storySaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Posting Story
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Foto otomatis dikompres ~50%. Video maksimal 25 MB.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="font-mono text-base">Story Aktif</CardTitle>
+                <CardDescription>{stories.length} story masih tampil di halaman publikmu.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stories.length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8 border border-dashed border-border rounded-lg">
+                    Belum ada story aktif.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {stories.map((s) => (
+                      <div key={s.id} className="relative rounded-lg overflow-hidden border border-border bg-muted aspect-[3/4] group">
+                        {s.mediaUrl ? (
+                          s.mediaType === "video" ? (
+                            <video src={s.mediaUrl} className="w-full h-full object-cover" muted />
+                          ) : (
+                            <img src={s.mediaUrl} alt="" className="w-full h-full object-cover" />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center p-3 text-center text-xs font-mono bg-gradient-to-br from-primary/20 to-accent/20">
+                            {s.text}
+                          </div>
+                        )}
+                        {s.text && s.mediaUrl && (
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-[11px] text-white line-clamp-2">{s.text}</p>
+                          </div>
+                        )}
+                        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono">
+                          {formatRemaining(s.expiresAt)}
+                        </div>
+                        <button
+                          onClick={() => handleStoryDelete(s.id)}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 hover:bg-destructive text-white flex items-center justify-center"
+                          aria-label="Hapus"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

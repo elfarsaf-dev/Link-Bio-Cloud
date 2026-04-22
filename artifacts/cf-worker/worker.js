@@ -9,6 +9,8 @@
 const SUPABASE_URL = "https://bgwkwlrkvbspycqsdeif.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY = "PASTE_SERVICE_ROLE_KEY_DI_SINI";
 const JWT_SECRET = "PASTE_JWT_SECRET_DI_SINI";
+const GITHUB_TOKEN = "PASTE_GITHUB_TOKEN_DI_SINI";
+const GITHUB_REPO  = "elfarsaf-dev/lawuscape";
 
 // ─── CORS ────────────────────────────────────────────────────
 const CORS = {
@@ -108,6 +110,10 @@ function toLink(r) {
   return { id: r.id, title: r.title, url: r.url, icon: r.icon ?? null,
     clickCount: r.click_count ?? 0, sortOrder: r.sort_order ?? 0,
     isActive: r.is_active ?? true, createdAt: r.created_at };
+}
+function toStory(r) {
+  return { id: r.id, text: r.text ?? null, mediaUrl: r.media_url ?? null,
+    mediaType: r.media_type ?? null, createdAt: r.created_at, expiresAt: r.expires_at };
 }
 
 // ─── HANDLERS ────────────────────────────────────────────────
@@ -275,8 +281,73 @@ async function publicProfile(username) {
   const profiles = await sb(`/profile?username=eq.${encodeURIComponent(username.toLowerCase())}&limit=1`);
   if (!profiles?.length) return json({ error: "User not found" }, 404);
   const p = profiles[0];
-  const lnks = await sb(`/links?user_id=eq.${p.user_id}&is_active=eq.true&order=sort_order.asc`);
-  return json({ profile: toProfile(p), links: lnks?.map(toLink) ?? [] });
+  const nowIso = new Date().toISOString();
+  const [lnks, sts] = await Promise.all([
+    sb(`/links?user_id=eq.${p.user_id}&is_active=eq.true&order=sort_order.asc`),
+    sb(`/lh_stories?user_id=eq.${p.user_id}&expires_at=gt.${nowIso}&order=created_at.desc`).catch(() => []),
+  ]);
+  return json({
+    profile: toProfile(p),
+    links: lnks?.map(toLink) ?? [],
+    stories: sts?.map(toStory) ?? [],
+  });
+}
+
+// ─── UPLOAD (proxy ke GitHub) ────────────────────────────────
+async function upload(req) {
+  try {
+    const body = await req.json();
+    if (!body?.content || !body?.fileName) return json({ success: false, error: "fileName & content wajib" }, 400);
+    const safeName = String(body.fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `${Date.now()}-${safeName}`;
+    const path = `uploads/${fileName}`;
+    const gh = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        "Content-Type": "application/json",
+        "User-Agent": "nexvia-worker",
+      },
+      body: JSON.stringify({ message: "upload file", content: body.content }),
+    });
+    const data = await gh.json();
+    if (!gh.ok) return json({ success: false, error: data.message || "Upload gagal" }, 500);
+    const cdnUrl = `https://cdn.jsdelivr.net/gh/${GITHUB_REPO}@main/${path}`;
+    return json({ success: true, content: { download_url: cdnUrl }, raw: data });
+  } catch (err) {
+    return json({ success: false, error: err.message }, 500);
+  }
+}
+
+// ─── STORIES (24 jam) ────────────────────────────────────────
+async function stories(req, sid) {
+  const u = await getUser(req);
+  if (!u) return json({ error: "Unauthorized" }, 401);
+
+  if (req.method === "GET" && !sid) {
+    const nowIso = new Date().toISOString();
+    const rows = await sb(`/lh_stories?user_id=eq.${u.userId}&expires_at=gt.${nowIso}&order=created_at.desc`);
+    return json(rows?.map(toStory) ?? []);
+  }
+  if (req.method === "POST" && !sid) {
+    const body = await req.json();
+    if (!body.text && !body.mediaUrl) return json({ error: "Story harus berisi teks atau media" }, 400);
+    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+    const [s] = await sb("/lh_stories", { method: "POST", body: JSON.stringify({
+      id: crypto.randomUUID(),
+      user_id: u.userId,
+      text: body.text ?? null,
+      media_url: body.mediaUrl ?? null,
+      media_type: body.mediaType ?? null,
+      expires_at: expiresAt,
+    }) });
+    return json(toStory(s), 201);
+  }
+  if (req.method === "DELETE" && sid) {
+    await sb(`/lh_stories?id=eq.${sid}&user_id=eq.${u.userId}`, { method: "DELETE" });
+    return json({ success: true });
+  }
+  return json({ error: "Method not allowed" }, 405);
 }
 
 // ─── MAIN ────────────────────────────────────────────────────
@@ -293,6 +364,10 @@ export default {
       if (path === "/profile") return profile(request);
       if (path === "/stats/reset" && request.method === "POST") return resetStats(request);
       if (path === "/stats") return stats(request);
+      if (path === "/upload" && request.method === "POST") return upload(request);
+      if (path === "/stories") return stories(request);
+      const sid = path.match(/^\/stories\/([^/]+)$/);
+      if (sid) return stories(request, sid[1]);
       const click = path.match(/^\/links\/([^/]+)\/click$/);
       if (click && request.method === "POST") return linkClick(click[1]);
       const lid = path.match(/^\/links\/([^/]+)$/);

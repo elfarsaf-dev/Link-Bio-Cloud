@@ -324,7 +324,10 @@ function StoryViewer({
       </button>
 
       {/* Content */}
-      <div className="relative w-full max-w-md aspect-[9/16] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative max-w-md w-full max-h-[85dvh] flex items-center justify-center px-4"
+        onClick={(e) => e.stopPropagation()}
+      >
         {story.mediaUrl ? (
           story.mediaType === "video" ? (
             <video
@@ -333,13 +336,17 @@ function StoryViewer({
               playsInline
               controls={false}
               onEnded={next}
-              className="w-full h-full object-contain"
+              className="max-w-full max-h-[85dvh] w-auto h-auto object-contain rounded-lg"
             />
           ) : (
-            <img src={story.mediaUrl} alt="" className="w-full h-full object-contain" />
+            <img
+              src={story.mediaUrl}
+              alt=""
+              className="max-w-full max-h-[85dvh] w-auto h-auto object-contain rounded-lg"
+            />
           )
         ) : (
-          <div className="w-full h-full flex items-center justify-center p-6">
+          <div className="w-full flex items-center justify-center py-10">
             <div className="relative max-w-[85%] bg-gradient-to-br from-pink-500 via-fuchsia-500 to-orange-400 text-white rounded-3xl rounded-bl-md px-5 py-4 shadow-2xl">
               <p className="text-base sm:text-lg font-mono font-medium leading-snug whitespace-pre-wrap break-words">
                 {story.text}
@@ -350,7 +357,7 @@ function StoryViewer({
           </div>
         )}
         {story.text && story.mediaUrl && (
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 pb-6">
+          <div className="absolute inset-x-4 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 pb-6 rounded-b-lg">
             <p className="text-white text-sm whitespace-pre-wrap">{story.text}</p>
           </div>
         )}

@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a0a",
-  "theme_color": "#FF3C00",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "lang": "id-ID",
   "categories": ["social", "productivity", "lifestyle"],
   "icons": [

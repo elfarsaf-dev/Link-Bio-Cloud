@@ -3,7 +3,10 @@ import App from "./App";
 import "./index.css";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { API_URL } from "./config";
+import { registerServiceWorker } from "./lib/register-sw";
 
 setBaseUrl(API_URL);
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+registerServiceWorker();

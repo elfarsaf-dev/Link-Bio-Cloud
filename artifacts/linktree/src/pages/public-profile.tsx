@@ -7,6 +7,16 @@ import { detectSocial } from "@/lib/social-icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_URL } from "@/config";
 import { getTheme, buildCssVars } from "@/lib/themes";
+import {
+  detectInAppBrowser,
+  isAndroid,
+  isIOS,
+  isWhatsAppUrl,
+  parseWhatsAppUrl,
+  buildWhatsAppAndroidIntent,
+  copyToClipboard,
+} from "@/lib/in-app-browser";
+import { Copy, ExternalLink, AlertCircle } from "lucide-react";
 
 interface Story {
   id: string;
@@ -49,6 +59,7 @@ export default function PublicProfile() {
   const [notFound, setNotFound] = useState(false);
 
   const recordClick = useRecordLinkClick();
+  const [waBlockedUrl, setWaBlockedUrl] = useState<string | null>(null);
 
   const theme = getTheme(profile?.backgroundTheme);
 
@@ -79,6 +90,20 @@ export default function PublicProfile() {
 
   const handleLinkClick = (id: string, url: string) => {
     recordClick.mutate({ id });
+    const inApp = detectInAppBrowser();
+
+    if (isWhatsAppUrl(url) && inApp) {
+      const parsed = parseWhatsAppUrl(url);
+      if (parsed && isAndroid()) {
+        // Android: launch WhatsApp directly via intent (bypasses TikTok/IG webview)
+        window.location.href = buildWhatsAppAndroidIntent(parsed.phone, parsed.text);
+        return;
+      }
+      // iOS in-app or unknown: show helper modal with copy/instructions
+      setWaBlockedUrl(url);
+      return;
+    }
+
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -202,6 +227,15 @@ export default function PublicProfile() {
         </a>
       </div>
 
+      {/* WhatsApp in-app helper */}
+      {waBlockedUrl && (
+        <WhatsAppHelperModal
+          url={waBlockedUrl}
+          inApp={detectInAppBrowser()}
+          onClose={() => setWaBlockedUrl(null)}
+        />
+      )}
+
       {/* Story viewer */}
       {storyIdx !== null && stories[storyIdx] && profile && (
         <StoryViewer
@@ -323,6 +357,117 @@ function StoryViewer({
       </div>
 
       <style>{`@keyframes progress { from { width: 0% } to { width: 100% } }`}</style>
+    </div>
+  );
+}
+
+function WhatsAppHelperModal({
+  url,
+  inApp,
+  onClose,
+}: {
+  url: string;
+  inApp: ReturnType<typeof detectInAppBrowser>;
+  onClose: () => void;
+}) {
+  const parsed = parseWhatsAppUrl(url);
+  const [copied, setCopied] = useState<"url" | "phone" | null>(null);
+  const ios = isIOS();
+
+  const handleCopy = async (text: string, kind: "url" | "phone") => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 1800);
+    }
+  };
+
+  const appLabel =
+    inApp === "tiktok" ? "TikTok"
+    : inApp === "instagram" ? "Instagram"
+    : inApp === "facebook" ? "Facebook"
+    : inApp === "messenger" ? "Messenger"
+    : inApp === "line" ? "LINE"
+    : inApp === "snapchat" ? "Snapchat"
+    : inApp === "twitter" ? "X / Twitter"
+    : inApp === "linkedin" ? "LinkedIn"
+    : "aplikasi ini";
+
+  return (
+    <div
+      className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-10 h-10 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-mono font-bold text-base">Buka di browser dulu</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                Browser bawaan {appLabel} memblokir buka WhatsApp langsung.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="shrink-0 w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center"
+              aria-label="Tutup"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-dashed border-border bg-secondary/40 p-3 space-y-2">
+            <p className="text-xs font-mono font-semibold">Cara cepat:</p>
+            {ios ? (
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+                <li>Tap titik tiga <span className="font-mono">⋯</span> di pojok kanan atas.</li>
+                <li>Pilih <span className="font-mono font-semibold">"Buka di browser"</span> (Safari/Chrome).</li>
+                <li>Link WhatsApp otomatis terbuka di sana.</li>
+              </ol>
+            ) : (
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
+                <li>Tap titik tiga <span className="font-mono">⋮</span> di pojok kanan atas.</li>
+                <li>Pilih <span className="font-mono font-semibold">"Buka di browser"</span> / "Open in Chrome".</li>
+                <li>Link WhatsApp otomatis terbuka di sana.</li>
+              </ol>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#25D366] text-white font-mono text-sm font-semibold hover:bg-[#1fb155] transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Coba Buka WhatsApp
+            </a>
+            <button
+              onClick={() => handleCopy(url, "url")}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background hover:bg-muted font-mono text-sm transition-colors"
+            >
+              <Copy className="w-4 h-4" />
+              {copied === "url" ? "Tersalin!" : "Salin Link"}
+            </button>
+            {parsed?.phone && (
+              <button
+                onClick={() => handleCopy(parsed.phone, "phone")}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-mono text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copied === "phone" ? "Nomor tersalin!" : `Salin nomor (+${parsed.phone})`}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth";
 import { THEMES, getTheme } from "@/lib/themes";
 import { detectSocial } from "@/lib/social-icons";
+import { PLATFORMS, FALLBACK_PLATFORM, detectPlatform, type Platform } from "@/lib/platforms";
 import { uploadFile } from "@/lib/upload";
 import { API_URL } from "@/config";
 
@@ -104,23 +105,57 @@ export default function AdminDashboard() {
 
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
-  const [linkForm, setLinkForm] = useState({ title: "", url: "", isActive: true });
+  const [linkPlatformId, setLinkPlatformId] = useState<string | null>(null);
+  const [linkForm, setLinkForm] = useState({ title: "", value: "", extra: "", isActive: true });
+
+  const currentPlatform: Platform | null = linkPlatformId
+    ? PLATFORMS.find((p) => p.id === linkPlatformId) ?? FALLBACK_PLATFORM
+    : null;
 
   const openCreateLink = () => {
     setEditingLinkId(null);
-    setLinkForm({ title: "", url: "", isActive: true });
+    setLinkPlatformId(null);
+    setLinkForm({ title: "", value: "", extra: "", isActive: true });
     setIsLinkDialogOpen(true);
   };
 
   const openEditLink = (link: any) => {
     setEditingLinkId(link.id);
-    setLinkForm({ title: link.title, url: link.url, isActive: link.isActive });
+    const detected = detectPlatform(link.url);
+    setLinkPlatformId(detected.platform.id);
+    setLinkForm({
+      title: link.title,
+      value: detected.value,
+      extra: detected.extra ?? "",
+      isActive: link.isActive,
+    });
     setIsLinkDialogOpen(true);
   };
 
+  const selectPlatform = (p: Platform) => {
+    setLinkPlatformId(p.id);
+    setLinkForm((f) => ({
+      ...f,
+      title: f.title || p.defaultTitle,
+    }));
+  };
+
   const handleLinkSave = () => {
+    if (!currentPlatform) {
+      toast({ title: "Pilih platform dulu.", variant: "destructive" });
+      return;
+    }
+    const value = linkForm.value.trim();
+    if (!value) {
+      toast({ title: "Isi dulu data linknya.", variant: "destructive" });
+      return;
+    }
+    const url = currentPlatform.build(value, linkForm.extra);
+    const title = (linkForm.title || currentPlatform.defaultTitle || "Link").trim();
+    const data = { title, url, isActive: linkForm.isActive };
+
     if (editingLinkId) {
-      updateLink.mutate({ id: editingLinkId, data: linkForm }, {
+      updateLink.mutate({ id: editingLinkId, data }, {
         onSuccess: () => {
           toast({ title: "Link diperbarui." });
           queryClient.invalidateQueries({ queryKey: getGetLinksQueryKey() });
@@ -128,7 +163,7 @@ export default function AdminDashboard() {
         },
       });
     } else {
-      createLink.mutate({ data: linkForm }, {
+      createLink.mutate({ data }, {
         onSuccess: () => {
           toast({ title: "Link ditambahkan." });
           queryClient.invalidateQueries({ queryKey: getGetLinksQueryKey() });
@@ -745,47 +780,192 @@ export default function AdminDashboard() {
 
       {/* Dialog Tambah/Edit Link */}
       <Dialog open={isLinkDialogOpen} onOpenChange={setIsLinkDialogOpen}>
-        <DialogContent className="w-[calc(100%-2rem)] max-w-sm sm:max-w-md border-border bg-card rounded-xl">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm sm:max-w-md border-border bg-card rounded-xl max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-mono text-lg">{editingLinkId ? "Edit Link" : "Tambah Link"}</DialogTitle>
+            <DialogTitle className="font-mono text-lg">
+              {editingLinkId ? "Edit Link" : currentPlatform ? `Tambah ${currentPlatform.name}` : "Pilih Platform"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="title">Judul</Label>
-              <Input
-                id="title"
-                value={linkForm.title}
-                onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
-                placeholder="Contoh: Instagram"
-                className="bg-background font-mono"
-              />
+
+          {!currentPlatform ? (
+            <div className="grid grid-cols-3 gap-2 py-2">
+              {PLATFORMS.map((p) => {
+                const Icon = p.Icon;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => selectPlatform(p)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-border hover:border-primary/60 hover:bg-primary/5 transition-colors active:scale-[0.98]"
+                  >
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${p.color}1A`, color: p.color }}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[11px] font-mono font-semibold text-center leading-tight">{p.name}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="url">URL</Label>
-              <Input
-                id="url"
-                value={linkForm.url}
-                onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-                placeholder="https://instagram.com/username"
-                className="bg-background font-mono text-sm"
-              />
+          ) : (
+            <div className="grid gap-4 py-2">
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/40">
+                <div
+                  className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${currentPlatform.color}1A`, color: currentPlatform.color }}
+                >
+                  <currentPlatform.Icon className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono font-semibold text-sm">{currentPlatform.name}</p>
+                </div>
+                {!editingLinkId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs font-mono"
+                    onClick={() => setLinkPlatformId(null)}
+                  >
+                    Ganti
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="title">Judul</Label>
+                <Input
+                  id="title"
+                  value={linkForm.title}
+                  onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
+                  placeholder={currentPlatform.defaultTitle || "Judul link"}
+                  className="bg-background font-mono"
+                />
+              </div>
+
+              {currentPlatform.mode === "whatsapp" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="value">Nomor WhatsApp</Label>
+                    <Input
+                      id="value"
+                      type="tel"
+                      inputMode="tel"
+                      value={linkForm.value}
+                      onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })}
+                      placeholder={currentPlatform.placeholder}
+                      className="bg-background font-mono text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Pakai kode negara, contoh: 62812… (tanpa tanda +)</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="extra">Pesan Default</Label>
+                    <Textarea
+                      id="extra"
+                      value={linkForm.extra}
+                      onChange={(e) => setLinkForm({ ...linkForm, extra: e.target.value })}
+                      placeholder={currentPlatform.placeholder2}
+                      rows={2}
+                      className="bg-background font-mono text-sm resize-none"
+                    />
+                  </div>
+                </>
+              ) : currentPlatform.mode === "username" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="value">Username</Label>
+                  <div className="flex items-stretch rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring">
+                    {currentPlatform.inputPrefix && (
+                      <span className="px-3 flex items-center text-sm font-mono text-muted-foreground border-r border-input bg-secondary/40">
+                        {currentPlatform.inputPrefix}
+                      </span>
+                    )}
+                    <input
+                      id="value"
+                      value={linkForm.value}
+                      onChange={(e) =>
+                        setLinkForm({
+                          ...linkForm,
+                          value: e.target.value.replace(/^@+/, "").replace(/\s+/g, ""),
+                        })
+                      }
+                      placeholder={currentPlatform.placeholder}
+                      className="flex-1 bg-transparent px-3 py-2 text-sm font-mono outline-none"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Tanda <span className="font-mono">@</span> otomatis dihapus.
+                  </p>
+                </div>
+              ) : currentPlatform.mode === "email" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="value">Alamat Email</Label>
+                  <Input
+                    id="value"
+                    type="email"
+                    inputMode="email"
+                    value={linkForm.value}
+                    onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })}
+                    placeholder={currentPlatform.placeholder}
+                    className="bg-background font-mono text-sm"
+                    autoCapitalize="off"
+                  />
+                </div>
+              ) : currentPlatform.mode === "phone" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="value">Nomor Telepon</Label>
+                  <Input
+                    id="value"
+                    type="tel"
+                    inputMode="tel"
+                    value={linkForm.value}
+                    onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })}
+                    placeholder={currentPlatform.placeholder}
+                    className="bg-background font-mono text-sm"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="value">URL Lengkap</Label>
+                  <Input
+                    id="value"
+                    type="url"
+                    inputMode="url"
+                    value={linkForm.value}
+                    onChange={(e) => setLinkForm({ ...linkForm, value: e.target.value })}
+                    placeholder={currentPlatform.placeholder}
+                    className="bg-background font-mono text-sm"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <Label htmlFor="active" className="cursor-pointer">Tampilkan di profil</Label>
+                <Switch
+                  id="active"
+                  checked={linkForm.isActive}
+                  onCheckedChange={(v) => setLinkForm({ ...linkForm, isActive: v })}
+                />
+              </div>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <Label htmlFor="active" className="cursor-pointer">Tampilkan di profil</Label>
-              <Switch
-                id="active"
-                checked={linkForm.isActive}
-                onCheckedChange={(v) => setLinkForm({ ...linkForm, isActive: v })}
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)} className="flex-1 sm:flex-none">Batal</Button>
-            <Button onClick={handleLinkSave} disabled={createLink.isPending || updateLink.isPending} className="flex-1 sm:flex-none">
-              {(createLink.isPending || updateLink.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Simpan
-            </Button>
-          </DialogFooter>
+          )}
+
+          {currentPlatform && (
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)} className="flex-1 sm:flex-none">Batal</Button>
+              <Button onClick={handleLinkSave} disabled={createLink.isPending || updateLink.isPending} className="flex-1 sm:flex-none">
+                {(createLink.isPending || updateLink.isPending) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Simpan
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

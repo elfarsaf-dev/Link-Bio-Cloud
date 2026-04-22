@@ -95,20 +95,26 @@ export default function PublicProfile() {
 
     if (isWhatsAppUrl(url) && inApp) {
       const parsed = parseWhatsAppUrl(url);
-      // Show modal first (guaranteed fallback if direct launch is blocked)
+      // Always show modal so user has manual fallback even if redirect "succeeds"
       setWaBlockedUrl(url);
       if (parsed) {
-        // Defer the redirect so React can paint the modal before navigation.
-        // If WhatsApp opens, page is hidden anyway. If blocked, modal stays.
         const redirectUrl = isAndroid()
           ? buildWhatsAppAndroidIntent(parsed.phone, parsed.text)
           : isIOS()
           ? buildWhatsAppScheme(parsed.phone, parsed.text)
           : null;
         if (redirectUrl) {
-          setTimeout(() => {
-            window.location.href = redirectUrl;
-          }, 50);
+          // Wait long enough for React to paint the modal, then redirect.
+          // Two rAFs guarantee a frame has been rendered before navigation,
+          // and the extra timeout ensures the modal stays visible if the
+          // user comes back from WhatsApp or the intent gets blocked.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                window.location.href = redirectUrl;
+              }, 300);
+            });
+          });
         }
       }
       return;

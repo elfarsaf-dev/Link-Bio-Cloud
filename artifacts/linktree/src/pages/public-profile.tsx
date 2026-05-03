@@ -411,7 +411,7 @@ function CopyPhoneButton({ phone }: { phone: string }) {
       {copied ? (
         <>
           <Check className="w-4 h-4" />
-          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Tersalin</span>
+          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Salin</span>
         </>
       ) : (
         <>

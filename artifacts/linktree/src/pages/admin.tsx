@@ -580,7 +580,7 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Foto otomatis dikompres ~50%. Video maksimal 25 MB.
+                  Foto otomatis dikompres ~70%. Video maksimal 25 MB. Format iPhone HEIC/HEIF belum didukung.
                 </p>
               </CardContent>
             </Card>
@@ -598,15 +598,20 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {stories.map((s) => (
-                      <div key={s.id} className="relative rounded-lg overflow-hidden border border-border bg-muted aspect-[3/4] group">
+                      <div
+                        key={s.id}
+                        className={`relative rounded-lg overflow-hidden border border-border bg-muted aspect-[3/4] group ${
+                          s.mediaUrl ? "bg-black" : "bg-gradient-to-br from-primary/20 to-accent/20"
+                        }`}
+                      >
                         {s.mediaUrl ? (
                           s.mediaType === "video" ? (
-                            <video src={s.mediaUrl} className="w-full h-full object-cover" muted />
+                            <video src={s.mediaUrl} className="w-full h-full object-contain bg-black" muted />
                           ) : (
-                            <img src={s.mediaUrl} alt="" className="w-full h-full object-cover" />
+                            <img src={s.mediaUrl} alt="" className="w-full h-full object-contain bg-black" />
                           )
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center p-3 text-center text-xs font-mono bg-gradient-to-br from-primary/20 to-accent/20">
+                          <div className="w-full h-full flex items-center justify-center p-3 text-center text-xs font-mono">
                             {s.text}
                           </div>
                         )}

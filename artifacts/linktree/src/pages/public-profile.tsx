@@ -228,9 +228,9 @@ export default function PublicProfile() {
                       <MoveRight className="shrink-0 w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all duration-200 z-10 ml-2" />
                     )}
                   </button>
-                  {waPhone && (
-                    <CopyPhoneButton phone={waPhone} />
-                  )}
+                    {waPhone && (
+                      <CopyPhoneButton phone={waPhone} />
+                    )}
                 </div>
               );
             })
@@ -404,20 +404,14 @@ function CopyPhoneButton({ phone }: { phone: string }) {
     <button
       type="button"
       onClick={handle}
-      className="shrink-0 px-3 sm:px-4 flex items-center justify-center gap-1.5 border-l border-border bg-card hover:bg-[#25D366]/10 hover:text-[#25D366] text-muted-foreground transition-colors active:scale-95 z-10"
+      className="shrink-0 px-3 sm:px-4 flex items-center justify-center border-l border-border bg-card hover:bg-[#25D366]/10 hover:text-[#25D366] text-muted-foreground transition-colors active:scale-95 z-10 font-mono text-sm font-semibold"
       aria-label={copied ? "Nomor tersalin" : "Salin nomor WhatsApp"}
       title={copied ? "Tersalin!" : `Salin +${phone}`}
     >
       {copied ? (
-        <>
-          <Check className="w-4 h-4" />
-          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Salin</span>
-        </>
+        <span>Salin</span>
       ) : (
-        <>
-          <Copy className="w-4 h-4" />
-          <span className="hidden sm:inline text-[11px] font-mono font-semibold">Salin</span>
-        </>
+        <span>Salin</span>
       )}
     </button>
   );
